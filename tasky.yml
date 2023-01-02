@@ -1,0 +1,151 @@
+version: '3.4'
+
+services:
+  identityserver:
+    image: registry.traefik.studentdumbways.my.id/identityserver:dev
+    networks:
+      - traefik-public
+    environment:
+      App__SelfUrl: "https://id.tasky.traefik.studentdumbways.my.id"
+      App__ClientUrl: "https://app.tasky.traefik.studentdumbways.my.id,https://gw.tasky.traefik.studentdumbways.my.id"
+      App__CorsOrigins: "https://app.tasky.traefik.studentdumbways.my.id,https://gw.tasky.traefik.studentdumbways.my.id"
+      App__RedirectAllowedUrls: "https://app.tasky.traefik.studentdumbways.my.id,https://gw.tasky.traefik.studentdumbways.my.id"
+      ConnectionStrings__SaaSService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskySaaSService;Pooling=false;"
+      ConnectionStrings__IdentityService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyIdentityService;Pooling=false;"
+      ConnectionStrings__AdministrationService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyAdministrationService;Pooling=false;"
+      ConnectionStrings__ProjectService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyProjectService;Pooling=false;"
+      Redis__Configuration : "206.189.147.1:6379,password=my_master_password"
+      RabbitMQ__Connections__Default__HostName : "206.189.147.1"
+      RabbitMQ__Connections__EventBus__ClientName : "TaskyIdentityService"
+      RabbitMQ__Connections__EventBus__ExchangeName : "Tasky"
+      Serilog__WriteTo__[0]__Name : "Seq"
+      Serilog__WriteTo__[0]__Args__serverUrl : "https://seq.youtube.antosubash.com"
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.identityserver.rule=Host(`id.tasky.traefik.studentdumbways.my.id`)"
+        - "traefik.http.services.identityserver.loadbalancer.server.port=80"
+        - "traefik.http.routers.identityserver.entrypoints=websecure"
+        - "traefik.http.routers.identityserver.tls=true"
+        - "traefik.http.routers.identityserver.tls.certresolver=leresolver"
+
+  gateway:
+    image: registry.traefik.studentdumbways.my.id/gateway:dev
+    networks:
+      - traefik-public
+    environment:
+      ReverseProxy__Clusters__main__Destinations__main__Address : "http://206.189.147.1:7001"
+      ReverseProxy__Clusters__identity__Destinations__identity__Address : "http://206.189.147.1:7002"
+      ReverseProxy__Clusters__account__Destinations__account__Address : "http://206.189.147.1:7002"
+      ReverseProxy__Clusters__saas__Destinations__saas__Address : "http://206.189.147.1:7003"
+      ReverseProxy__Clusters__project__Destinations__project__Address : "http://206.189.147.1:7004"
+      Serilog__WriteTo__[0]__Name : "Seq"
+      Serilog__WriteTo__[0]__Args__serverUrl : "https://seq.traefik.studentdumbways.my.id"
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.gateway.rule=Host(`gw.tasky.traefik.studentdumbways.my.id`)"
+        - "traefik.http.services.gateway.loadbalancer.server.port=80"
+        - "traefik.http.routers.gateway.entrypoints=websecure"
+        - "traefik.http.routers.gateway.tls=true"
+        - "traefik.http.routers.gateway.tls.certresolver=leresolver"
+
+  administrationservice:
+    image: registry.traefik.studentdumbways.my.id/administration:dev
+    ports:
+      - target: 80
+        published: 7001
+        protocol: tcp
+        mode: host
+    environment:
+      App__CorsOrigins: http://206.189.147.1:7000
+      ConnectionStrings__SaaSService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskySaaSService;Pooling=false;"
+      ConnectionStrings__IdentityService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyIdentityService;Pooling=false;"
+      ConnectionStrings__AdministrationService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyAdministrationService;Pooling=false;"
+      ConnectionStrings__ProjectService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyProjectService;Pooling=false;"
+      Redis__Configuration : "206.189.147.1:6379,password=my_master_password"
+      AuthServer__Authority : "https://id.tasky.traefik.studentdumbways.my.id"
+      AuthServer__RequireHttpsMetadata : "false"
+      AuthServer__SwaggerClientId : "AdministrationService_Swagger"
+      AuthServer__SwaggerClientSecret : "1q2w3e*"
+      RabbitMQ__Connections__Default__HostName : "206.189.147.1"
+      RabbitMQ__Connections__EventBus__ClientName : "TaskyAdministrationService"
+      RabbitMQ__Connections__EventBus__ExchangeName : "Tasky"
+      Serilog__WriteTo__[0]__Name : "Seq"
+      Serilog__WriteTo__[0]__Args__serverUrl : "https://seq.traefik.studentdumbways.my.id"
+
+  identityservice:
+    image: registry.traefik.studentdumbways.my.id/identityservice:dev
+    ports:
+      - target: 80
+        published: 7002
+        protocol: tcp
+        mode: host
+    environment:
+      App__CorsOrigins: http://206.189.147.1:7000
+      ConnectionStrings__SaaSService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskySaaSService;Pooling=false;"
+      ConnectionStrings__IdentityService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyIdentityService;Pooling=false;"
+      ConnectionStrings__AdministrationService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyAdministrationService;Pooling=false;"
+      ConnectionStrings__ProjectService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyProjectService;Pooling=false;"
+      Redis__Configuration : "206.189.147.1:6379,password=my_master_password"
+      AuthServer__Authority : "https://id.tasky.traefik.studentdumbways.my.id"
+      AuthServer__RequireHttpsMetadata : "false"
+      AuthServer__SwaggerClientId : "IdentityService_Swagger"
+      AuthServer__SwaggerClientSecret : "1q2w3e*"
+      RabbitMQ__Connections__Default__HostName : "206.189.147.1"
+      RabbitMQ__Connections__EventBus__ClientName : "TaskyIdentityService"
+      RabbitMQ__Connections__EventBus__ExchangeName : "Tasky"
+      Serilog__WriteTo__[0]__Name : "Seq"
+      Serilog__WriteTo__[0]__Args__serverUrl : "https://seq.traefik.studentdumbways.my.id"
+
+  saasservice:
+    image: registry.traefik.studentdumbways.my.id/saas:dev
+    ports:
+      - target: 80
+        published: 7003
+        protocol: tcp
+        mode: host
+    environment:
+      App__CorsOrigins: http://206.189.147.1:7000
+      ConnectionStrings__SaaSService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskySaaSService;Pooling=false;"
+      ConnectionStrings__IdentityService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyIdentityService;Pooling=false;"
+      ConnectionStrings__AdministrationService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyAdministrationService;Pooling=false;"
+      ConnectionStrings__ProjectService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyProjectService;Pooling=false;"
+      Redis__Configuration : "206.189.147.1:6379,password=my_master_password"
+      AuthServer__Authority : "https://id.tasky.traefik.studentdumbways.my.id"
+      AuthServer__RequireHttpsMetadata : "false"
+      AuthServer__SwaggerClientId : "IdentityService_Swagger"
+      AuthServer__SwaggerClientSecret : "1q2w3e*"
+      RabbitMQ__Connections__Default__HostName : "206.189.147.1"
+      RabbitMQ__Connections__EventBus__ClientName : "TaskyIdentityService"
+      RabbitMQ__Connections__EventBus__ExchangeName : "Tasky"
+      Serilog__WriteTo__[0]__Name : "Seq"
+      Serilog__WriteTo__[0]__Args__serverUrl : "https://seq.traefik.studentdumbways.my.id"
+
+  projectservice:
+    image: registry.traefik.studentdumbways.my.id/project:dev
+    ports:
+      - target: 80
+        published: 7004
+        protocol: tcp
+        mode: host
+    environment:
+      App__CorsOrigins: http://206.189.147.1:7000
+      ConnectionStrings__SaaSService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskySaaSService;Pooling=false;"
+      ConnectionStrings__IdentityService: "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyIdentityService;Pooling=false;"
+      ConnectionStrings__AdministrationService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyAdministrationService;Pooling=false;"
+      ConnectionStrings__ProjectService : "User ID=postgres;Password=postgres_password;Host=206.189.147.1;Port=5432;Database=TaskyProjectService;Pooling=false;"
+      Redis__Configuration : "206.189.147.1:6379,password=my_master_password"
+      AuthServer__Authority : "https://id.tasky.traefik.studentdumbways.my.id"
+      AuthServer__RequireHttpsMetadata : "false"
+      AuthServer__SwaggerClientId : "IdentityService_Swagger"
+      AuthServer__SwaggerClientSecret : "1q2w3e*"
+      RabbitMQ__Connections__Default__HostName : "206.189.147.1"
+      RabbitMQ__Connections__EventBus__ClientName : "TaskyIdentityService"
+      RabbitMQ__Connections__EventBus__ExchangeName : "Tasky"
+      Serilog__WriteTo__[0]__Name : "Seq"
+      Serilog__WriteTo__[0]__Args__serverUrl : "https://seq.traefik.studentdumbways.my.id"
+
+networks:
+  traefik-public:
+    external: true
